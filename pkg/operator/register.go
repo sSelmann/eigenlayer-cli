@@ -138,21 +138,33 @@ func RegisterCmd(p utils.Prompter) *cli.Command {
 				return err
 			}
 
-			if !status {
-				receipt, err := elWriter.RegisterAsOperator(ctx, operatorCfg.Operator)
-				if err != nil {
-					logger.Infof("Error while registering operator %s", utils.EmojiCrossMark)
-					return err
-				}
-				logger.Infof(
-					"Operator registration transaction at: %s %s",
-					getTransactionLink(receipt.TxHash.String(), &operatorCfg.ChainId),
-					utils.EmojiCheckMark,
-				)
+status, err := reader.IsOperatorRegistered(&bind.CallOpts{Context: ctx}, operatorCfg.Operator)
+if err != nil {
+    return err
+}
 
-			} else {
-				logger.Infof("Operator is already registered on EigenLayer %s\n", utils.EmojiCheckMark)
-			}
+if !status {
+    receipt, err := elWriter.RegisterAsOperator(ctx, operatorCfg.Operator)
+    if err != nil {
+        logger.Infof("Error while registering operator %s", utils.EmojiCrossMark)
+
+        // Özel hata kontrolü
+        if ethErr, ok := err.(*eth.Error); ok && ethErr.Code == -32000 {
+            fmt.Println("Make sure that the address specified in your config file is the created ecdsa address.")
+        }
+
+        return err
+    }
+    logger.Infof(
+        "Operator registration transaction at: %s %s",
+        getTransactionLink(receipt.TxHash.String(), &operatorCfg.ChainId),
+        utils.EmojiCheckMark,
+    )
+
+} else {
+    logger.Infof("Operator is already registered on EigenLayer %s\n", utils.EmojiCheckMark)
+}
+
 
 			receipt, err := elWriter.RegisterBLSPublicKey(ctx, keyPair, operatorCfg.Operator)
 			if err != nil {
